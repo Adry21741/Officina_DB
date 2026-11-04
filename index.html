@@ -62,7 +62,8 @@ function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';se
 async function init(){
   let c=null;try{c=JSON.parse(localStorage.getItem('cfg'))}catch{}
   if(!c)return setup();
-  db=supabase.createClient(c.url,c.key);
+  db=supabase.createClient(c.url,c.key,{auth:{persistSession:true,autoRefreshToken:true,storage:window.localStorage}});
+  db.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT')login()});
   const{data}=await db.auth.getSession();
   data.session?load():login();
 }
@@ -81,7 +82,10 @@ function login(){
 async function load(){
   const[a,b]=await Promise.all([db.from('clienti').select('*').order('nome'),db.from('lavori').select('*').order('created_at',{ascending:false})]);
   const err=a.error||b.error;
-  if(err)return toast('Errore: '+err.message);
+  if(err){
+    if(err.code==='PGRST301'||err.status===401||/jwt/i.test(err.message))return login();
+    return toast('Errore: '+err.message);
+  }
   clienti=a.data;lavori=b.data;shell();
 }
 
