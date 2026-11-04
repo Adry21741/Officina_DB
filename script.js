@@ -656,6 +656,7 @@
         }
 
         for (const key of ['costo_ricambi', 'costo_manodopera']) {
+          if (formData[key] === undefined) continue;
           if (formData[key] === null) formData[key] = 0;
           if (formData[key] !== null && (!Number.isFinite(Number(formData[key])) || Number(formData[key]) < 0)) {
             toast('I costi devono essere numeri pari o superiori a zero.');
