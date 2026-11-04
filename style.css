@@ -1,0 +1,240 @@
+  :root {
+    --bg: #e8ebed;
+    --card: #fff;
+    --tx: #17252d;
+    --mu: #5d6b73;
+    --ac: #1f5fbf;
+    --on: #fff;
+    --bd: #d3d9dd;
+    --s1: #7b8791;
+    --s2: #c98a00;
+    --s3: #1c8a4a;
+    --s4: #aab3b9;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12191d;
+      --card: #1b252b;
+      --tx: #e8eef1;
+      --mu: #93a1aa;
+      --ac: #6ea3f2;
+      --on: #0c1418;
+      --bd: #2c3a42;
+      --s1: #93a1aa;
+      --s2: #e0a526;
+      --s3: #4cc47e;
+      --s4: #5d6b73;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--tx);
+    font: 16px/1.4 Barlow, system-ui, sans-serif;
+  }
+
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 14px 14px 96px;
+  }
+
+  h1, h2 {
+    font-family: 'Barlow Condensed', Barlow, sans-serif;
+    margin: 0 0 8px;
+  }
+
+  h1 { font-size: 28px; }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  header h1 { margin: 0; }
+
+  button, input, select, textarea {
+    font: inherit;
+    color: inherit;
+  }
+
+  button {
+    border: 0;
+    border-radius: 8px;
+    padding: 10px 16px;
+    background: var(--ac);
+    color: var(--on);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  button.ghost {
+    background: transparent;
+    color: var(--tx);
+    border: 1px solid var(--bd);
+  }
+
+  button.danger {
+    background: transparent;
+    color: #c0392b;
+    border: 1px solid currentColor;
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--ac);
+    outline-offset: 2px;
+  }
+
+  .tabs, .chips {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    margin-bottom: 10px;
+  }
+
+  .tabs button, .chips button {
+    background: transparent;
+    color: var(--mu);
+    border: 1px solid var(--bd);
+    padding: 7px 14px;
+    white-space: nowrap;
+    border-radius: 99px;
+  }
+
+  .tabs button.on, .chips button.on {
+    background: var(--tx);
+    color: var(--bg);
+    border-color: var(--tx);
+  }
+
+  input, select, textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--bd);
+    border-radius: 8px;
+    background: var(--card);
+  }
+
+  label {
+    display: block;
+    margin-bottom: 10px;
+    font-size: 14px;
+    color: var(--mu);
+  }
+
+  label > * {
+    margin-top: 4px;
+    color: var(--tx);
+  }
+
+  .card {
+    background: var(--card);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    border-left: 6px solid var(--c, var(--s1));
+  }
+
+  .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .plate {
+    font: 700 21px 'Barlow Condensed', sans-serif;
+    letter-spacing: .06em;
+    background: #fff;
+    color: #111;
+    border: 2px solid #111;
+    border-radius: 5px;
+    padding: 0 9px 0 28px;
+    position: relative;
+    white-space: nowrap;
+  }
+
+  .plate:before {
+    content: 'I';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 19px;
+    background: #1d4fa8;
+    color: #fff;
+    font-size: 11px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 1px;
+  }
+
+  .mu {
+    color: var(--mu);
+    font-size: 14px;
+  }
+
+  .row {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 6px;
+  }
+
+  select.st {
+    width: auto;
+    padding: 6px 8px;
+    font-size: 14px;
+  }
+
+  .fab {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    font-size: 30px;
+    padding: 0;
+    box-shadow: 0 3px 10px #0004;
+  }
+
+  dialog {
+    border: 0;
+    border-radius: 12px;
+    padding: 18px;
+    width: min(460px, 94vw);
+    max-height: 92vh;
+    background: var(--bg);
+    color: var(--tx);
+  }
+
+  dialog::backdrop { background: #0008; }
+
+  #toast {
+    position: fixed;
+    left: 50%;
+    bottom: 86px;
+    transform: translateX(-50%);
+    background: var(--tx);
+    color: var(--bg);
+    padding: 10px 16px;
+    border-radius: 8px;
+    display: none;
+    max-width: 90vw;
+  }
+
+  .empty {
+    text-align: center;
+    color: var(--mu);
+    padding: 40px 0;
+  }
+
+  a { color: var(--ac); }
