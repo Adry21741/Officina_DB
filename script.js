@@ -42,7 +42,6 @@
     let q = '';
     let clienti = [];
     let lavori = [];
-    let lavoroEspanso = null;
     let clienteEspanso = null;
 
     function toast(message) {
@@ -96,6 +95,7 @@
     }
 
     function renderSetup() {
+      $('#app').classList.remove('wide');
       $('#app').innerHTML = `
         <h1>Collega il database</h1>
         <p class="mu">Incolla l’indirizzo del progetto Supabase e la chiave pubblica (anon o publishable). Mai la chiave service_role.</p>
@@ -122,6 +122,7 @@
     }
 
     function renderLogin() {
+      $('#app').classList.remove('wide');
       $('#app').innerHTML = `
         <h1>Officina di Casa</h1>
         <p class="mu">Accedi con l’utente creato in Supabase.</p>
@@ -180,6 +181,7 @@
     }
 
     function renderShell() {
+      $('#app').classList.add('wide');
       $('#app').innerHTML = `
         <header>
           <h1>Officina di Casa</h1>
@@ -207,7 +209,6 @@
         button.onclick = () => {
           tab = button.dataset.t;
           q = '';
-          lavoroEspanso = null;
           clienteEspanso = null;
           renderShell();
         };
@@ -240,10 +241,8 @@
           openWorkForm(lavori.find((item) => String(item.id) === button.dataset.e));
         } else if (button.dataset.c) {
           openClientForm(clienti.find((item) => String(item.id) === button.dataset.c));
-        } else if (button.dataset.exp) {
-          const id = button.dataset.exp;
-          lavoroEspanso = String(lavoroEspanso) === id ? null : id;
-          renderList();
+        } else if (button.dataset.details) {
+          openWorkDetails(lavori.find((item) => String(item.id) === button.dataset.details));
         } else if (button.dataset.clientExp) {
           const id = button.dataset.clientExp;
           clienteEspanso = String(clienteEspanso) === id ? null : id;
@@ -253,10 +252,7 @@
           q = '';
           renderShell();
         } else if (button.dataset.openJob) {
-          tab = 'lavori';
-          q = '';
-          lavoroEspanso = button.dataset.openJob;
-          renderShell();
+          openWorkDetails(lavori.find((item) => String(item.id) === button.dataset.openJob));
         } else if (button.dataset.export) {
           esportaCSV(button.dataset.export);
         }
@@ -347,34 +343,86 @@
         .sort((a, b) => new Date(a.appuntamento_at) - new Date(b.appuntamento_at)).slice(0, 5);
 
       return `
-        <section class="summary-grid" aria-label="Riepilogo">
-          <article class="summary-card"><span>Lavori attivi</span><strong>${attivi.length}</strong></article>
-          <article class="summary-card"><span>Pronti</span><strong>${pronti.length}</strong></article>
-          <article class="summary-card"><span>Clienti</span><strong>${clienti.length}</strong></article>
-          <article class="summary-card"><span>Importo lavori</span><strong>${eur(inIncasso)}</strong></article>
-        </section>
-        <section class="panel">
-          <div class="section-heading"><h2>Prossimi appuntamenti</h2><button class="ghost" data-show-tab="calendario">Apri calendario</button></div>
-          ${appuntamenti.length ? appuntamenti.map((job) => `
-            <button class="agenda-row" data-open-job="${esc(job.id)}">
-              <span><strong>${esc(job.targa || 'Lavoro')}</strong><span>${esc(job.veicolo || '')}</span></span>
-              <span>${esc(formatDateTime(job.appuntamento_at))}</span>
-            </button>
-          `).join('') : '<p class="mu">Non ci sono appuntamenti programmati.</p>'}
-        </section>
-        <section class="panel">
-          <div class="section-heading"><h2>Lavori recenti</h2><button class="ghost" data-show-tab="lavori">Vedi tutti</button></div>
-          ${lavori.slice(0, 4).map((job) => `<div class="recent-row"><strong>${esc(job.targa || 'Senza targa')} · ${esc(job.veicolo || '')}</strong><span class="status-label">${esc((STATI.find(([key]) => key === job.stato) || ['', 'Da fare'])[1])}</span></div>`).join('') || '<p class="mu">Ancora nessun lavoro registrato.</p>'}
-        </section>
+        <div class="dashboard-grid">
+          <section class="summary-grid" aria-label="Riepilogo">
+            <article class="summary-card"><span>Lavori attivi</span><strong>${attivi.length}</strong></article>
+            <article class="summary-card"><span>Pronti</span><strong>${pronti.length}</strong></article>
+            <article class="summary-card"><span>Clienti</span><strong>${clienti.length}</strong></article>
+            <article class="summary-card"><span>Importo lavori</span><strong>${eur(inIncasso)}</strong></article>
+          </section>
+          <section class="panel">
+            <div class="section-heading"><h2>Prossimi appuntamenti</h2><button class="ghost" data-show-tab="calendario">Apri calendario</button></div>
+            ${appuntamenti.length ? appuntamenti.map((job) => `
+              <button class="agenda-row" data-open-job="${esc(job.id)}">
+                <span><strong>${esc(job.targa || 'Lavoro')}</strong><span>${esc(job.veicolo || '')}</span></span>
+                <span>${esc(formatDateTime(job.appuntamento_at))}</span>
+              </button>
+            `).join('') : '<p class="mu">Non ci sono appuntamenti programmati.</p>'}
+          </section>
+          <section class="panel">
+            <div class="section-heading"><h2>Lavori recenti</h2><button class="ghost" data-show-tab="lavori">Vedi tutti</button></div>
+            ${lavori.slice(0, 4).map((job) => `<div class="recent-row"><strong>${esc(job.targa || 'Senza targa')} · ${esc(job.veicolo || '')}</strong><span class="status-label">${esc((STATI.find(([key]) => key === job.stato) || ['', 'Da fare'])[1])}</span></div>`).join('') || '<p class="mu">Ancora nessun lavoro registrato.</p>'}
+          </section>
+        </div>
       `;
+    }
+
+    function renderJobDetails(job) {
+      const cliente = findCliente(job.cliente_id);
+      const history = job.targa
+        ? lavori.filter((item) => item.id !== job.id && item.targa?.toLowerCase() === job.targa.toLowerCase())
+        : [];
+      return `
+        <div class="job-details">
+          <div class="detail-grid">
+            <div><span>Cliente</span><strong>${esc(cliente?.nome || '—')}</strong></div>
+            <div><span>Data ingresso</span><strong>${esc(formatDate(job.data_ingresso))}</strong></div>
+            <div><span>Appuntamento</span><strong>${esc(formatDateTime(job.appuntamento_at))}</strong></div>
+            <div><span>Ricambi</span><strong>${eur(job.costo_ricambi)}</strong></div>
+            <div><span>Manodopera</span><strong>${eur(job.costo_manodopera)}</strong></div>
+            <div><span>Margine stimato</span><strong>${eur(jobMargin(job))}</strong></div>
+            <div><span>Consegna</span><strong>${esc(formatDate(job.data_consegna))}</strong></div>
+          </div>
+          ${job.note ? `<p><strong>Note:</strong> ${esc(job.note)}</p>` : ''}
+          ${safePhotoLinks(job.foto_url) ? `<div class="photo-links"><strong>Foto:</strong> ${safePhotoLinks(job.foto_url)}</div>` : ''}
+          ${history.length ? `<div class="history-list"><strong>Altri interventi per ${esc(job.targa)}:</strong>${history.map((item) => `<p>${esc(formatDate(item.data_ingresso))} · ${esc(item.descrizione || item.veicolo || 'Lavoro')} (${esc((STATI.find(([key]) => key === item.stato) || ['', 'Da fare'])[1])})</p>`).join('')}</div>` : ''}
+        </div>
+      `;
+    }
+
+    function openWorkDetails(job) {
+      if (!job) return;
+      const dialog = $('#dlg');
+      const cliente = findCliente(job.cliente_id);
+      dialog.classList.add('detail-dialog');
+      dialog.innerHTML = `
+        <div class="detail-heading">
+          <div>
+            <h2>Scheda lavoro</h2>
+            <div class="job-title"><strong>${esc(job.targa || 'Senza targa')} · ${esc(job.veicolo || 'Veicolo non specificato')}</strong></div>
+            ${cliente ? `<div class="mu">${esc(cliente.nome)}</div>` : ''}
+          </div>
+          <button type="button" class="ghost" id="close-details" aria-label="Chiudi scheda">Chiudi</button>
+        </div>
+        <p>${esc(job.descrizione || '')}</p>
+        <p class="mu">Stato: ${esc((STATI.find(([key]) => key === job.stato) || ['', 'Da fare'])[1])} · Importo: ${eur(job.importo)}</p>
+        ${renderJobDetails(job)}
+        <div class="row">
+          <button type="button" class="ghost" id="close-details-footer">Chiudi</button>
+          <button type="button" id="edit-details">Modifica</button>
+        </div>
+      `;
+      $('#close-details').onclick = () => dialog.close();
+      $('#close-details-footer').onclick = () => dialog.close();
+      $('#edit-details').onclick = () => {
+        dialog.close();
+        openWorkForm(job);
+      };
+      dialog.showModal();
     }
 
     function renderJobCard(job) {
       const cliente = findCliente(job.cliente_id);
-      const expanded = String(lavoroEspanso) === String(job.id);
-      const history = job.targa
-        ? lavori.filter((item) => item.id !== job.id && item.targa?.toLowerCase() === job.targa.toLowerCase())
-        : [];
       return `
         <article class="card job-card" style="--c:var(${COL[job.stato] || '--s1'})">
           <div class="top">
@@ -388,25 +436,9 @@
             <select class="st" data-id="${esc(job.id)}" aria-label="Stato">
               ${STATI.map(([key, label]) => `<option value="${key}"${key === job.stato ? ' selected' : ''}>${label}</option>`).join('')}
             </select>
-            <button class="ghost" data-exp="${esc(job.id)}">${expanded ? 'Chiudi scheda' : 'Scheda lavoro'}</button>
+            <button class="ghost" data-details="${esc(job.id)}">Scheda lavoro</button>
             <button class="ghost" data-e="${esc(job.id)}">Modifica</button>
           </div>
-          ${expanded ? `
-            <div class="job-details">
-              <div class="detail-grid">
-                <div><span>Cliente</span><strong>${esc(cliente?.nome || '—')}</strong></div>
-                <div><span>Data ingresso</span><strong>${esc(formatDate(job.data_ingresso))}</strong></div>
-                <div><span>Appuntamento</span><strong>${esc(formatDateTime(job.appuntamento_at))}</strong></div>
-                <div><span>Ricambi</span><strong>${eur(job.costo_ricambi)}</strong></div>
-                <div><span>Manodopera</span><strong>${eur(job.costo_manodopera)}</strong></div>
-                <div><span>Margine stimato</span><strong>${eur(jobMargin(job))}</strong></div>
-                <div><span>Consegna</span><strong>${esc(formatDate(job.data_consegna))}</strong></div>
-              </div>
-              ${job.note ? `<p><strong>Note:</strong> ${esc(job.note)}</p>` : ''}
-              ${safePhotoLinks(job.foto_url) ? `<div class="photo-links"><strong>Foto:</strong> ${safePhotoLinks(job.foto_url)}</div>` : ''}
-              ${history.length ? `<div class="history-list"><strong>Altri interventi per ${esc(job.targa)}:</strong>${history.map((item) => `<p>${esc(formatDate(item.data_ingresso))} · ${esc(item.descrizione || item.veicolo || 'Lavoro')} (${esc((STATI.find(([key]) => key === item.stato) || ['', 'Da fare'])[1])})</p>`).join('')}</div>` : ''}
-            </div>
-          ` : ''}
         </article>
       `;
     }
@@ -430,7 +462,7 @@
       }).sort((a, b) => new Date(a.appuntamento_at) - new Date(b.appuntamento_at));
 
       return appointments.length
-        ? appointments.map((job) => `<section class="panel agenda-card"><div class="section-heading"><div><strong>${esc(formatDateTime(job.appuntamento_at))}</strong><p>${esc(job.targa || 'Lavoro')} · ${esc(job.veicolo || '')} · ${esc(findCliente(job.cliente_id)?.nome || 'Cliente non assegnato')}</p></div><button class="ghost" data-e="${esc(job.id)}">Apri lavoro</button></div><p>${esc(job.descrizione || '')}</p></section>`).join('')
+        ? appointments.map((job) => `<section class="panel agenda-card"><div class="section-heading"><div><strong>${esc(formatDateTime(job.appuntamento_at))}</strong><p>${esc(job.targa || 'Lavoro')} · ${esc(job.veicolo || '')} · ${esc(findCliente(job.cliente_id)?.nome || 'Cliente non assegnato')}</p></div><button class="ghost" data-open-job="${esc(job.id)}">Apri lavoro</button></div><p>${esc(job.descrizione || '')}</p></section>`).join('')
         : '<div class="empty">Nessun appuntamento trovato. Imposta data e ora dalla scheda lavoro.</div>';
     }
 
@@ -533,6 +565,7 @@
 
     function openModal(title, fields, values, saveAction, deleteAction) {
       const dialog = $('#dlg');
+      dialog.classList.remove('detail-dialog');
       const requiredFields = ['nome', 'descrizione'];
 
       dialog.innerHTML = `
