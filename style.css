@@ -55,6 +55,18 @@
     padding: 28px clamp(20px, 4vw, 56px) 96px;
   }
 
+  main.wide #bar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px 24px;
+    margin-bottom: 14px;
+  }
+
+  main.wide #bar:empty { display: none; }
+  main.wide #bar .chips { flex: 1; margin-bottom: 0; }
+  main.wide #bar .search-label { flex: 0 1 320px; min-width: 220px; }
+
   h1, h2 {
     font-family: 'Barlow Condensed', Barlow, sans-serif;
     margin: 0 0 8px;
@@ -201,6 +213,21 @@
     box-shadow: 0 2px 8px rgba(23, 37, 45, .05);
     transition: box-shadow .15s ease, transform .15s ease;
   }
+
+  .cards-grid {
+    display: grid;
+    gap: 12px;
+  }
+
+  .work-grid, .client-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  }
+
+  .agenda-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
+  }
+
+  .cards-grid > .card, .cards-grid > .panel { margin-bottom: 0; }
 
   .card:hover {
     box-shadow: 0 5px 14px rgba(23, 37, 45, .09);
@@ -421,6 +448,9 @@
 
   @media (max-width: 760px) {
     main.wide { padding: 20px 16px 96px; }
+    main.wide #bar { display: block; }
+    main.wide #bar .chips { margin-bottom: 10px; }
+    main.wide #bar .search-label { min-width: 0; }
     .dashboard-grid { grid-template-columns: 1fr; }
   }
 

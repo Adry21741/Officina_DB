@@ -451,7 +451,9 @@
         const searchable = [job.targa, job.veicolo, job.descrizione, cliente?.nome].join(' ').toLowerCase();
         return matchesFilter && (!searchText || searchable.includes(searchText));
       });
-      return filtered.map((job) => renderJobCard(job)).join('');
+      return filtered.length
+        ? `<div class="cards-grid work-grid">${filtered.map((job) => renderJobCard(job)).join('')}</div>`
+        : '';
     }
 
     function renderCalendar() {
@@ -462,13 +464,13 @@
       }).sort((a, b) => new Date(a.appuntamento_at) - new Date(b.appuntamento_at));
 
       return appointments.length
-        ? appointments.map((job) => `<section class="panel agenda-card"><div class="section-heading"><div><strong>${esc(formatDateTime(job.appuntamento_at))}</strong><p>${esc(job.targa || 'Lavoro')} · ${esc(job.veicolo || '')} · ${esc(findCliente(job.cliente_id)?.nome || 'Cliente non assegnato')}</p></div><button class="ghost" data-open-job="${esc(job.id)}">Apri lavoro</button></div><p>${esc(job.descrizione || '')}</p></section>`).join('')
+        ? `<div class="cards-grid agenda-grid">${appointments.map((job) => `<section class="panel agenda-card"><div class="section-heading"><div><strong>${esc(formatDateTime(job.appuntamento_at))}</strong><p>${esc(job.targa || 'Lavoro')} · ${esc(job.veicolo || '')} · ${esc(findCliente(job.cliente_id)?.nome || 'Cliente non assegnato')}</p></div><button class="ghost" data-open-job="${esc(job.id)}">Apri lavoro</button></div><p>${esc(job.descrizione || '')}</p></section>`).join('')}</div>`
         : '<div class="empty">Nessun appuntamento trovato. Imposta data e ora dalla scheda lavoro.</div>';
     }
 
     function renderClientList() {
       const searchText = q.trim().toLowerCase();
-      return clienti.filter((cliente) => !searchText || [cliente.nome, cliente.telefono].join(' ').toLowerCase().includes(searchText))
+      const cards = clienti.filter((cliente) => !searchText || [cliente.nome, cliente.telefono].join(' ').toLowerCase().includes(searchText))
         .map((cliente) => {
           const history = lavori.filter((job) => String(job.cliente_id) === String(cliente.id))
             .sort((a, b) => new Date(b.created_at || b.data_ingresso) - new Date(a.created_at || a.data_ingresso));
@@ -483,6 +485,7 @@
             </article>
           `;
         }).join('');
+      return cards ? `<div class="cards-grid client-grid">${cards}</div>` : '';
     }
 
     function renderReport() {
