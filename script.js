@@ -123,15 +123,19 @@
 
     function renderLogin() {
       $('#app').classList.remove('wide');
+      const rememberedEmail = localStorage.getItem('rememberedEmail') || '';
       $('#app').innerHTML = `
-        <h1>Officina di Casa</h1>
-        <p class="mu">Accedi con l’utente creato in Supabase.</p>
+        <h1 class="brand-title"><img src="logo.svg" alt=""><span>Officina di Casa</span></h1>
         <form id="login-form">
           <label>Email
-            <input name="email" type="email" autocomplete="username" required>
+            <input name="email" type="email" autocomplete="username" value="${esc(rememberedEmail)}" required>
           </label>
           <label>Password
             <input name="password" type="password" autocomplete="current-password" required>
+          </label>
+          <label class="remember-login">
+            <span>Ricorda l’email su questo dispositivo</span>
+            <input name="rememberEmail" type="checkbox"${rememberedEmail ? ' checked' : ''}>
           </label>
           <div class="row" style="justify-content:flex-start">
             <button>Accedi</button>
@@ -148,7 +152,14 @@
       $('#login-form').onsubmit = async (event) => {
         event.preventDefault();
         const formData = Object.fromEntries(new FormData(event.target));
-        const { error } = await db.auth.signInWithPassword(formData);
+        const { email, password, rememberEmail } = formData;
+        if (rememberEmail) {
+          localStorage.setItem('rememberedEmail', email);
+        } else {
+          localStorage.removeItem('rememberedEmail');
+        }
+
+        const { error } = await db.auth.signInWithPassword({ email, password });
         if (error) {
           toast('Accesso non riuscito: ' + error.message);
           return;
@@ -184,7 +195,7 @@
       $('#app').classList.add('wide');
       $('#app').innerHTML = `
         <header>
-          <h1>Officina di Casa</h1>
+          <h1 class="brand-title"><img src="logo.svg" alt=""><span>Officina di Casa</span></h1>
           <button class="ghost" id="logout">Esci</button>
         </header>
         <nav class="tabs" aria-label="Sezioni">
