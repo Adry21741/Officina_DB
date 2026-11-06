@@ -46,6 +46,9 @@ main {
   max-width: 720px; margin: 0 auto;
   padding: calc(16px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) 110px calc(14px + env(safe-area-inset-left));
 }
+@media (min-width: 761px) {
+  main.login-page { max-width: min(1440px, 90vw); }
+}
 main.wide { max-width: 1440px; padding-left: clamp(14px, 4vw, 56px); padding-right: clamp(14px, 4vw, 56px); }
 main.wide #bar { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px 24px; margin-bottom: 14px; }
 main.wide #bar:empty { display: none; }

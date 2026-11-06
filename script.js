@@ -96,6 +96,7 @@
 
     function renderSetup() {
       $('#app').classList.remove('wide');
+      $('#app').classList.remove('login-page');
       $('#app').innerHTML = `
         <h1>Collega il database</h1>
         <p class="mu">Incolla l’indirizzo del progetto Supabase e la chiave pubblica (anon o publishable). Mai la chiave service_role.</p>
@@ -123,6 +124,7 @@
 
     function renderLogin() {
       $('#app').classList.remove('wide');
+      $('#app').classList.add('login-page');
       const rememberedEmail = localStorage.getItem('rememberedEmail') || '';
       $('#app').innerHTML = `
         <h1 class="brand-title"><img src="logo.svg" alt=""><span>Officina di Casa</span></h1>
@@ -193,6 +195,7 @@
 
     function renderShell() {
       $('#app').classList.add('wide');
+      $('#app').classList.remove('login-page');
       $('#app').innerHTML = `
         <header>
           <h1 class="brand-title"><img src="logo.svg" alt=""><span>Officina di Casa</span></h1>
