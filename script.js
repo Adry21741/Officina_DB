@@ -336,6 +336,10 @@
       return clienti.find((cliente) => String(cliente.id) === String(clienteId));
     }
 
+    function nomeCliente(cliente) {
+      return [cliente?.nome, cliente?.cognome].filter(Boolean).join(' ');
+    }
+
     function safePhotoLinks(value) {
       const photos = Array.isArray(value) ? value : [];
       return photos.map((photo) => {
@@ -389,13 +393,13 @@
       return `
         <div class="job-details">
           <div class="detail-grid">
-            <div><span>Cliente</span><strong>${esc(cliente?.nome || '—')}</strong></div>
+            <div><span>Cliente</span><strong>${esc(nomeCliente(cliente) || '—')}</strong></div>
             <div><span>Data ingresso</span><strong>${esc(formatDate(job.data_ingresso))}</strong></div>
             <div><span>Appuntamento</span><strong>${esc(formatDateTime(job.appuntamento_at))}</strong></div>
             <div><span>Ricambi</span><strong>${eur(job.costo_ricambi)}</strong></div>
             <div><span>Manodopera</span><strong>${eur(job.costo_manodopera)}</strong></div>
             <div><span>Margine stimato</span><strong>${eur(jobMargin(job))}</strong></div>
-            <div><span>Consegna</span><strong>${esc(formatDate(job.data_consegna))}</strong></div>
+            <div><span>Data consegna</span><strong>${esc(formatDate(job.data_consegna))}</strong></div>
           </div>
           ${job.note ? `<p><strong>Note:</strong> ${esc(job.note)}</p>` : ''}
           ${safePhotoLinks(job.foto_url) ? `<div class="photo-links"><strong>Foto:</strong> ${safePhotoLinks(job.foto_url)}</div>` : ''}
@@ -408,13 +412,14 @@
       if (!job) return;
       const dialog = $('#dlg');
       const cliente = findCliente(job.cliente_id);
+      dialog.classList.remove('work-form-dialog');
       dialog.classList.add('detail-dialog');
       dialog.innerHTML = `
         <div class="detail-heading">
           <div>
             <h2>Scheda lavoro</h2>
             <div class="job-title"><strong>${esc(job.targa || 'Senza targa')} · ${esc(job.veicolo || 'Veicolo non specificato')}</strong></div>
-            ${cliente ? `<div class="mu">${esc(cliente.nome)}</div>` : ''}
+            ${cliente ? `<div class="mu">${esc(nomeCliente(cliente))}</div>` : ''}
           </div>
           <button type="button" class="ghost" id="close-details" aria-label="Chiudi scheda">Chiudi</button>
         </div>
@@ -443,7 +448,7 @@
             <span class="plate">${esc(job.targa || '—')}</span>
             <strong>${eur(job.importo)}</strong>
           </div>
-          <div class="job-title"><strong>${esc(job.veicolo || 'Veicolo non specificato')}</strong>${cliente ? ` · ${esc(cliente.nome)}` : ''}</div>
+          <div class="job-title"><strong>${esc(job.veicolo || 'Veicolo non specificato')}</strong>${cliente ? ` · ${esc(nomeCliente(cliente))}` : ''}</div>
           <div>${esc(job.descrizione || '')}</div>
           <div class="mu">Ingresso ${esc(formatDate(job.data_ingresso))}${job.appuntamento_at ? ` · Appuntamento ${esc(formatDateTime(job.appuntamento_at))}` : ''}</div>
           <div class="top job-actions">
@@ -462,7 +467,7 @@
       const filtered = lavori.filter((job) => {
         const matchesFilter = filtro === 'tutti' || (filtro === 'attivi' ? job.stato !== 'consegnato' : job.stato === filtro);
         const cliente = findCliente(job.cliente_id);
-        const searchable = [job.targa, job.veicolo, job.descrizione, cliente?.nome].join(' ').toLowerCase();
+        const searchable = [job.targa, job.veicolo, job.descrizione, nomeCliente(cliente)].join(' ').toLowerCase();
         return matchesFilter && (!searchText || searchable.includes(searchText));
       });
       return filtered.length
@@ -474,24 +479,24 @@
       const searchText = q.trim().toLowerCase();
       const appointments = lavori.filter((job) => {
         const cliente = findCliente(job.cliente_id);
-        return job.appuntamento_at && [job.targa, job.veicolo, job.descrizione, cliente?.nome].join(' ').toLowerCase().includes(searchText);
+        return job.appuntamento_at && [job.targa, job.veicolo, job.descrizione, nomeCliente(cliente)].join(' ').toLowerCase().includes(searchText);
       }).sort((a, b) => new Date(a.appuntamento_at) - new Date(b.appuntamento_at));
 
       return appointments.length
-        ? `<div class="cards-grid agenda-grid">${appointments.map((job) => `<section class="panel agenda-card"><div class="section-heading"><div><strong>${esc(formatDateTime(job.appuntamento_at))}</strong><p>${esc(job.targa || 'Lavoro')} · ${esc(job.veicolo || '')} · ${esc(findCliente(job.cliente_id)?.nome || 'Cliente non assegnato')}</p></div><button class="ghost" data-open-job="${esc(job.id)}">Apri lavoro</button></div><p>${esc(job.descrizione || '')}</p></section>`).join('')}</div>`
+        ? `<div class="cards-grid agenda-grid">${appointments.map((job) => `<section class="panel agenda-card"><div class="section-heading"><div><strong>${esc(formatDateTime(job.appuntamento_at))}</strong><p>${esc(job.targa || 'Lavoro')} · ${esc(job.veicolo || '')} · ${esc(nomeCliente(findCliente(job.cliente_id)) || 'Cliente non assegnato')}</p></div><button class="ghost" data-open-job="${esc(job.id)}">Apri lavoro</button></div><p>${esc(job.descrizione || '')}</p></section>`).join('')}</div>`
         : '<div class="empty">Nessun appuntamento trovato. Imposta data e ora dalla scheda lavoro.</div>';
     }
 
     function renderClientList() {
       const searchText = q.trim().toLowerCase();
-      const cards = clienti.filter((cliente) => !searchText || [cliente.nome, cliente.telefono].join(' ').toLowerCase().includes(searchText))
+      const cards = clienti.filter((cliente) => !searchText || [nomeCliente(cliente), cliente.telefono].join(' ').toLowerCase().includes(searchText))
         .map((cliente) => {
           const history = lavori.filter((job) => String(job.cliente_id) === String(cliente.id))
             .sort((a, b) => new Date(b.created_at || b.data_ingresso) - new Date(a.created_at || a.data_ingresso));
           const expanded = String(clienteEspanso) === String(cliente.id);
           return `
             <article class="card client-card">
-              <div class="top"><strong>${esc(cliente.nome)}</strong><button class="ghost" data-c="${esc(cliente.id)}">Modifica</button></div>
+              <div class="top"><strong>${esc(nomeCliente(cliente))}</strong><button class="ghost" data-c="${esc(cliente.id)}">Modifica</button></div>
               ${cliente.telefono ? `<a href="tel:${esc(cliente.telefono)}">${esc(cliente.telefono)}</a>` : ''}
               <div class="mu">${cliente.note ? `${esc(cliente.note)} · ` : ''}${history.length} ${history.length === 1 ? 'lavoro' : 'lavori'}</div>
               <div class="top job-actions"><button class="ghost" data-client-exp="${esc(cliente.id)}">${expanded ? 'Nascondi storico' : 'Storico interventi'}</button></div>
@@ -543,9 +548,10 @@
     function esportaCSV(kind) {
       const rows = kind === 'clienti'
         ? [
-            ['Nome', 'Telefono', 'Note', 'Numero lavori'],
+            ['Nome', 'Cognome', 'Telefono', 'Note', 'Numero lavori'],
             ...clienti.map((cliente) => [
               cliente.nome,
+              cliente.cognome,
               cliente.telefono,
               cliente.note,
               lavori.filter((job) => String(job.cliente_id) === String(cliente.id)).length
@@ -556,7 +562,7 @@
             ...lavori.map((job) => [
               job.targa,
               job.veicolo,
-              findCliente(job.cliente_id)?.nome,
+              nomeCliente(findCliente(job.cliente_id)),
               job.descrizione,
               (STATI.find(([key]) => key === job.stato) || ['', job.stato])[1],
               job.data_ingresso,
@@ -580,9 +586,10 @@
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
-    function openModal(title, fields, values, saveAction, deleteAction) {
+    function openModal(title, fields, values, saveAction, deleteAction, dialogClass = '') {
       const dialog = $('#dlg');
       dialog.classList.remove('detail-dialog');
+      dialog.classList.toggle('work-form-dialog', dialogClass === 'work-form-dialog');
       const requiredFields = ['nome', 'descrizione'];
 
       dialog.innerHTML = `
@@ -705,14 +712,14 @@
         [
           ['targa', 'Targa'],
           ['veicolo', 'Veicolo (marca e modello)'],
-          ['cliente_id', 'Cliente', 'select', [['', 'Nessuno'], ...clienti.map((cliente) => [cliente.id, cliente.nome])]],
+          ['cliente_id', 'Cliente', 'select', [['', 'Nessuno'], ...clienti.map((cliente) => [cliente.id, nomeCliente(cliente)])]],
           ['descrizione', 'Lavoro da fare', 'area'],
           ['stato', 'Stato', 'select', STATI],
           ['importo', 'Importo (€)', 'number'],
           ['costo_ricambi', 'Costo ricambi (€)', 'number'],
           ['costo_manodopera', 'Costo manodopera (€)', 'number'],
           ['data_ingresso', 'Data ingresso', 'date'],
-          ['appuntamento_at', 'Appuntamento', 'datetime-local'],
+          ['data_consegna', 'Data consegna', 'date'],
           ['foto_url', 'Link foto', 'photos'],
           ['note', 'Note', 'area']
         ],
@@ -722,13 +729,14 @@
             payload.targa = payload.targa.trim().toUpperCase();
           }
 
-          payload.data_consegna = payload.stato === 'consegnato' ? (work.data_consegna || oggi()) : null;
+          payload.data_consegna = payload.data_consegna || (payload.stato === 'consegnato' ? (work.data_consegna || oggi()) : null);
 
           return isNew
             ? db.from('lavori').insert(payload)
             : db.from('lavori').update(payload).eq('id', work.id);
         },
-        isNew ? null : () => db.from('lavori').delete().eq('id', work.id)
+        isNew ? null : () => db.from('lavori').delete().eq('id', work.id),
+        'work-form-dialog'
       );
     }
 
@@ -737,7 +745,7 @@
 
       openModal(
         isNew ? 'Nuovo cliente' : 'Modifica cliente',
-        [['nome', 'Nome'], ['telefono', 'Telefono', 'tel'], ['note', 'Note', 'area']],
+        [['nome', 'Nome'], ['cognome', 'Cognome'], ['telefono', 'Telefono', 'tel'], ['note', 'Note', 'area']],
         cliente,
         async (payload) => {
           return isNew

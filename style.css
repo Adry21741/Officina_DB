@@ -163,6 +163,8 @@ dialog {
   border: 0; border-radius: 20px; padding: 20px; width: min(460px, 94vw); max-height: 92vh;
   background: var(--bg); color: var(--tx); box-shadow: 0 18px 55px rgba(0, 0, 0, .25);
 }
+dialog.work-form-dialog { scrollbar-width: none; }
+dialog.work-form-dialog::-webkit-scrollbar { display: none; }
 dialog.detail-dialog { width: min(760px, 94vw); padding: 24px; overflow-y: auto; }
 dialog::backdrop { background: #0009; }
 .detail-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
