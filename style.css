@@ -153,7 +153,7 @@ select.st option { background: var(--card); color: var(--tx); }
 .fab {
   position: fixed; right: calc(18px + env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom));
   width: 60px; height: 60px; border-radius: 50%; font-size: 32px; padding: 0;
-  background: linear-gradient(135deg, #2563eb, #38bdf8); box-shadow: 0 6px 18px #0005;
+  background: linear-gradient(135deg, #1d4ed8, #2563eb); box-shadow: 0 6px 18px #0005;
 }
 
 dialog {
