@@ -230,6 +230,13 @@
 
       $('#list').onchange = async (event) => {
         const field = event.target;
+        if (field.id === 'csv-import') {
+          const [file] = field.files;
+          field.value = '';
+          if (file) await importaCSV(file);
+          return;
+        }
+
         const id = field.dataset.id;
         if (!id) return;
 
@@ -269,6 +276,8 @@
           openWorkDetails(lavori.find((item) => String(item.id) === button.dataset.openJob));
         } else if (button.dataset.export) {
           esportaCSV(button.dataset.export);
+        } else if (button.dataset.import) {
+          $('#csv-import').click();
         }
       };
 
@@ -395,7 +404,6 @@
           <div class="detail-grid">
             <div><span>Cliente</span><strong>${esc(nomeCliente(cliente) || '—')}</strong></div>
             <div><span>Data ingresso</span><strong>${esc(formatDate(job.data_ingresso))}</strong></div>
-            <div><span>Appuntamento</span><strong>${esc(formatDateTime(job.appuntamento_at))}</strong></div>
             <div><span>Ricambi</span><strong>${eur(job.costo_ricambi)}</strong></div>
             <div><span>Manodopera</span><strong>${eur(job.costo_manodopera)}</strong></div>
             <div><span>Margine stimato</span><strong>${eur(jobMargin(job))}</strong></div>
@@ -450,7 +458,7 @@
           </div>
           <div class="job-title"><strong>${esc(job.veicolo || 'Veicolo non specificato')}</strong>${cliente ? ` · ${esc(nomeCliente(cliente))}` : ''}</div>
           <div>${esc(job.descrizione || '')}</div>
-          <div class="mu">Ingresso ${esc(formatDate(job.data_ingresso))}${job.appuntamento_at ? ` · Appuntamento ${esc(formatDateTime(job.appuntamento_at))}` : ''}</div>
+          <div class="mu">Ingresso ${esc(formatDate(job.data_ingresso))}</div>
           <div class="top job-actions">
             <select class="st" data-id="${esc(job.id)}" aria-label="Stato">
               ${STATI.map(([key, label]) => `<option value="${key}"${key === job.stato ? ' selected' : ''}>${label}</option>`).join('')}
@@ -484,7 +492,7 @@
 
       return appointments.length
         ? `<div class="cards-grid agenda-grid">${appointments.map((job) => `<section class="panel agenda-card"><div class="section-heading"><div><strong>${esc(formatDateTime(job.appuntamento_at))}</strong><p>${esc(job.targa || 'Lavoro')} · ${esc(job.veicolo || '')} · ${esc(nomeCliente(findCliente(job.cliente_id)) || 'Cliente non assegnato')}</p></div><button class="ghost" data-open-job="${esc(job.id)}">Apri lavoro</button></div><p>${esc(job.descrizione || '')}</p></section>`).join('')}</div>`
-        : '<div class="empty">Nessun appuntamento trovato. Imposta data e ora dalla scheda lavoro.</div>';
+        : '<div class="empty">Nessun appuntamento trovato.</div>';
     }
 
     function renderClientList() {
@@ -520,7 +528,12 @@
           <article class="summary-card"><span>Lavori consegnati</span><strong>${completati}</strong></article>
         </section>
         <section class="panel">
-          <h2>Esporta dati</h2>
+          <h2>Importa ed esporta dati</h2>
+          <p class="mu">Importa un CSV di lavori o clienti esportato da questa app. Per collegare i lavori ai clienti, importa prima il CSV dei clienti.</p>
+          <div class="export-actions">
+            <button type="button" data-import="csv">Importa CSV</button>
+            <input id="csv-import" class="csv-file-input" type="file" accept=".csv,text/csv" aria-label="Seleziona un file CSV">
+          </div>
           <p class="mu">Scarica un file CSV compatibile con Excel e gli altri fogli di calcolo.</p>
           <div class="export-actions"><button data-export="lavori">Esporta lavori</button><button class="ghost" data-export="clienti">Esporta clienti</button></div>
           <p class="mu">Il margine è una stima calcolata come importo meno ricambi e manodopera; non è un dato contabile.</p>
@@ -537,6 +550,275 @@
       else if (tab === 'report') html = renderReport();
 
       $('#list').innerHTML = html || '<div class="empty">Niente da mostrare. Tocca + per aggiungere.</div>';
+    }
+
+    function normalizzaCSV(value) {
+      return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase().trim().replace(/[^a-z0-9]+/g, '');
+    }
+
+    function leggiCSV(text) {
+      const firstRecord = String(text).replace(/^\uFEFF/, '').split(/\r?\n/, 1)[0];
+      let quoted = false;
+      const counts = { ';': 0, ',': 0, '\t': 0 };
+      for (let index = 0; index < firstRecord.length; index += 1) {
+        const char = firstRecord[index];
+        if (char === '"' && firstRecord[index + 1] === '"' && quoted) {
+          index += 1;
+        } else if (char === '"') {
+          quoted = !quoted;
+        } else if (!quoted && Object.hasOwn(counts, char)) {
+          counts[char] += 1;
+        }
+      }
+      const delimiter = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+      if (!delimiter || delimiter[1] === 0) throw new Error('Non trovo il separatore nel file CSV.');
+
+      const rows = [];
+      let row = [];
+      let cell = '';
+      let inQuotes = false;
+      let afterQuote = false;
+      const source = String(text).replace(/^\uFEFF/, '');
+      for (let index = 0; index < source.length; index += 1) {
+        const char = source[index];
+        if (inQuotes) {
+          if (char === '"' && source[index + 1] === '"') {
+            cell += '"';
+            index += 1;
+          } else if (char === '"') {
+            inQuotes = false;
+            afterQuote = true;
+          } else {
+            cell += char;
+          }
+          continue;
+        }
+
+        if (afterQuote) {
+          if (char === delimiter[0]) {
+            row.push(cell);
+            cell = '';
+            afterQuote = false;
+          } else if (char === '\r' || char === '\n') {
+            row.push(cell);
+            if (row.some((value) => value.trim())) rows.push(row);
+            row = [];
+            cell = '';
+            afterQuote = false;
+            if (char === '\r' && source[index + 1] === '\n') index += 1;
+          } else if (!/\s/.test(char)) {
+            throw new Error('Il file CSV contiene virgolette non valide.');
+          }
+          continue;
+        }
+
+        if (char === '"') {
+          if (cell.length) throw new Error('Il file CSV contiene virgolette non valide.');
+          inQuotes = true;
+        } else if (char === delimiter[0]) {
+          row.push(cell);
+          cell = '';
+        } else if (char === '\r' || char === '\n') {
+          row.push(cell);
+          if (row.some((value) => value.trim())) rows.push(row);
+          row = [];
+          cell = '';
+          if (char === '\r' && source[index + 1] === '\n') index += 1;
+        } else {
+          cell += char;
+        }
+      }
+
+      if (inQuotes) throw new Error('Il file CSV contiene una cella non chiusa.');
+      if (cell || row.length) {
+        row.push(cell);
+        if (row.some((value) => value.trim())) rows.push(row);
+      }
+      if (rows.length < 2) throw new Error('Il file CSV non contiene righe da importare.');
+
+      const headers = rows[0].map(normalizzaCSV);
+      return rows.slice(1).map((values) => {
+        const record = {};
+        headers.forEach((header, index) => {
+          if (header && record[header] === undefined) record[header] = (values[index] || '').trim();
+        });
+        return record;
+      });
+    }
+
+    function valoreCSV(record, ...headers) {
+      for (const header of headers) {
+        const value = record[normalizzaCSV(header)];
+        if (value !== undefined) return value;
+      }
+      return '';
+    }
+
+    function dataCSV(value, rowNumber) {
+      const text = String(value || '').trim();
+      if (!text) return null;
+      let parts = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(text);
+      if (parts) {
+        const [, year, month, day] = parts.map(Number);
+        const date = new Date(Date.UTC(year, month - 1, day));
+        if (date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day) return text;
+      }
+      parts = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text);
+      if (parts) {
+        const [, day, month, year] = parts.map(Number);
+        const date = new Date(Date.UTC(year, month - 1, day));
+        if (date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day) {
+          return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        }
+      }
+      throw new Error(`Data non valida alla riga ${rowNumber}: ${text}`);
+    }
+
+    function numeroCSV(value, rowNumber, label, defaultValue = null) {
+      const text = String(value || '').trim().replace(/[€\s]/g, '');
+      if (!text) return defaultValue;
+      let normalized = text;
+      if (normalized.includes(',') && normalized.includes('.')) {
+        normalized = normalized.lastIndexOf(',') > normalized.lastIndexOf('.')
+          ? normalized.replace(/\./g, '').replace(',', '.')
+          : normalized.replace(/,/g, '');
+      } else {
+        normalized = normalized.replace(',', '.');
+      }
+      const number = Number(normalized);
+      if (!Number.isFinite(number)) throw new Error(`${label} non valido alla riga ${rowNumber}.`);
+      return number;
+    }
+
+    function statoCSV(value, rowNumber) {
+      const status = normalizzaCSV(value);
+      const statuses = new Map([
+        ['dafare', 'da_fare'], ['da_fare', 'da_fare'],
+        ['incorso', 'in_corso'], ['in_corso', 'in_corso'],
+        ['pronto', 'pronto'], ['consegnato', 'consegnato'], ['consegnata', 'consegnato']
+      ]);
+      if (!status) return 'da_fare';
+      const normalized = statuses.get(status);
+      if (!normalized) throw new Error(`Stato non riconosciuto alla riga ${rowNumber}: ${value}`);
+      return normalized;
+    }
+
+    function chiaveCliente(nome) {
+      return normalizzaCSV(nome);
+    }
+
+    function importaClienti(records) {
+      const errors = [];
+      const existing = new Set(clienti.map((cliente) => (
+        `${chiaveCliente(nomeCliente(cliente))}|${normalizzaCSV(cliente.telefono)}`
+      )));
+      const incoming = new Set();
+      const payload = [];
+
+      records.forEach((record, index) => {
+        const rowNumber = index + 2;
+        const nome = valoreCSV(record, 'Nome').trim();
+        const cognome = valoreCSV(record, 'Cognome').trim();
+        const telefono = valoreCSV(record, 'Telefono').trim();
+        if (!nome) {
+          errors.push(`Nome mancante alla riga ${rowNumber}.`);
+          return;
+        }
+        const key = `${chiaveCliente([nome, cognome].filter(Boolean).join(' '))}|${normalizzaCSV(telefono)}`;
+        if (!existing.has(key) && !incoming.has(key)) {
+          payload.push({ nome, cognome: cognome || null, telefono: telefono || null, note: valoreCSV(record, 'Note').trim() || null });
+          incoming.add(key);
+        }
+      });
+
+      if (errors.length) throw new Error(errors.slice(0, 5).join(' ') + (errors.length > 5 ? ` (+${errors.length - 5} errori)` : ''));
+      return { payload, skipped: records.length - payload.length };
+    }
+
+    function importaLavori(records) {
+      const errors = [];
+      const clientsByName = new Map();
+      clienti.forEach((cliente) => {
+        const key = chiaveCliente(nomeCliente(cliente));
+        if (key && !clientsByName.has(key)) clientsByName.set(key, cliente.id);
+      });
+      const payload = records.map((record, index) => {
+        const rowNumber = index + 2;
+        try {
+          const description = valoreCSV(record, 'Descrizione').trim();
+          if (!description) throw new Error(`Descrizione mancante alla riga ${rowNumber}.`);
+          const customerName = valoreCSV(record, 'Cliente').trim();
+          const clientId = customerName ? clientsByName.get(chiaveCliente(customerName)) : null;
+          if (customerName && !clientId) throw new Error(`Cliente "${customerName}" non trovato alla riga ${rowNumber}. Importa prima il CSV clienti.`);
+          const photos = valoreCSV(record, 'Foto').split(/\s+/).filter(Boolean);
+          for (const photo of photos) {
+            let url;
+            try {
+              url = new URL(photo);
+            } catch {
+              throw new Error(`URL foto non valido alla riga ${rowNumber}.`);
+            }
+            if (!['http:', 'https:'].includes(url.protocol)) throw new Error(`URL foto non valido alla riga ${rowNumber}.`);
+          }
+
+          return {
+            targa: valoreCSV(record, 'Targa').trim().toUpperCase() || null,
+            veicolo: valoreCSV(record, 'Veicolo').trim() || null,
+            cliente_id: clientId,
+            descrizione: description,
+            stato: statoCSV(valoreCSV(record, 'Stato'), rowNumber),
+            data_ingresso: dataCSV(valoreCSV(record, 'Data ingresso'), rowNumber) || oggi(),
+            data_consegna: dataCSV(valoreCSV(record, 'Consegna', 'Data consegna'), rowNumber),
+            importo: numeroCSV(valoreCSV(record, 'Importo'), rowNumber, 'Importo'),
+            costo_ricambi: numeroCSV(valoreCSV(record, 'Ricambi'), rowNumber, 'Ricambi', 0),
+            costo_manodopera: numeroCSV(valoreCSV(record, 'Manodopera'), rowNumber, 'Manodopera', 0),
+            note: valoreCSV(record, 'Note').trim() || null,
+            foto_url: photos
+          };
+        } catch (error) {
+          errors.push(error.message);
+          return null;
+        }
+      }).filter(Boolean);
+
+      if (errors.length) throw new Error(errors.slice(0, 5).join(' ') + (errors.length > 5 ? ` (+${errors.length - 5} errori)` : ''));
+      return payload;
+    }
+
+    async function importaCSV(file) {
+      try {
+        const records = leggiCSV(await file.text());
+        const headers = Object.keys(records[0]);
+        const isJobs = ['descrizione', 'stato', 'dataingresso'].some((header) => headers.includes(header));
+        const isClients = headers.includes('nome') && ['cognome', 'telefono', 'note'].some((header) => headers.includes(header));
+        if (isJobs === isClients) {
+          throw new Error('Formato CSV non riconosciuto. Seleziona un CSV di lavori o clienti esportato da questa app.');
+        }
+
+        if (isClients) {
+          const { payload, skipped } = importaClienti(records);
+          if (!payload.length) {
+            toast(`Nessun nuovo cliente da importare. Righe già presenti: ${skipped}.`);
+            return;
+          }
+          if (!confirm(`Importare ${payload.length} clienti${skipped ? ` (saltando ${skipped} duplicati)` : ''}?`)) return;
+          const { error } = await db.from('clienti').insert(payload);
+          if (error) throw new Error(error.message);
+          await loadData();
+          toast(`Importati ${payload.length} clienti${skipped ? `; saltati ${skipped} duplicati` : ''}.`);
+          return;
+        }
+
+        const payload = importaLavori(records);
+        if (!confirm(`Importare ${payload.length} lavori?`)) return;
+        const { error } = await db.from('lavori').insert(payload);
+        if (error) throw new Error(error.message);
+        await loadData();
+        toast(`Importati ${payload.length} lavori.`);
+      } catch (error) {
+        toast(`Importazione non riuscita: ${error.message}`);
+      }
     }
 
     function csvCell(value) {

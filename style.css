@@ -214,6 +214,7 @@ dialog::backdrop { background: #0009; }
 .photo-links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
 .field-help { display: block; margin-top: 5px; color: var(--mu); font-size: 12px; }
 .export-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.csv-file-input { display: none; }
 
 @media (max-width: 760px) {
   main.wide { padding-left: calc(14px + env(safe-area-inset-left)); padding-right: calc(14px + env(safe-area-inset-right)); }
