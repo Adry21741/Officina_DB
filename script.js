@@ -28,11 +28,11 @@
     };
 
     const FILT = [
-      ['attivi', 'Attivi'],
       ['da_fare', 'Da fare'],
       ['in_corso', 'In corso'],
       ['pronto', 'Pronti'],
       ['consegnato', 'Consegnati'],
+      ['attivi', 'Attivi'],
       ['tutti', 'Tutti']
     ];
 
@@ -404,6 +404,7 @@
           <div class="detail-grid">
             <div><span>Cliente</span><strong>${esc(nomeCliente(cliente) || '—')}</strong></div>
             <div><span>Data ingresso</span><strong>${esc(formatDate(job.data_ingresso))}</strong></div>
+            <div><span>Appuntamento</span><strong>${esc(formatDateTime(job.appuntamento_at))}</strong></div>
             <div><span>Ricambi</span><strong>${eur(job.costo_ricambi)}</strong></div>
             <div><span>Manodopera</span><strong>${eur(job.costo_manodopera)}</strong></div>
             <div><span>Margine stimato</span><strong>${eur(jobMargin(job))}</strong></div>
@@ -458,7 +459,7 @@
           </div>
           <div class="job-title"><strong>${esc(job.veicolo || 'Veicolo non specificato')}</strong>${cliente ? ` · ${esc(nomeCliente(cliente))}` : ''}</div>
           <div>${esc(job.descrizione || '')}</div>
-          <div class="mu">Ingresso ${esc(formatDate(job.data_ingresso))}</div>
+          <div class="mu">Ingresso ${esc(formatDate(job.data_ingresso))}${job.appuntamento_at ? ` · Appuntamento ${esc(formatDateTime(job.appuntamento_at))}` : ''}</div>
           <div class="top job-actions">
             <select class="st" data-id="${esc(job.id)}" aria-label="Stato">
               ${STATI.map(([key, label]) => `<option value="${key}"${key === job.stato ? ' selected' : ''}>${label}</option>`).join('')}
@@ -1000,6 +1001,7 @@
           ['importo', 'Importo (€)', 'number'],
           ['costo_ricambi', 'Costo ricambi (€)', 'number'],
           ['costo_manodopera', 'Costo manodopera (€)', 'number'],
+          ['appuntamento_at', 'Appuntamento', 'datetime-local'],
           ['data_ingresso', 'Data ingresso', 'date'],
           ['data_consegna', 'Data consegna', 'date'],
           ['foto_url', 'Link foto', 'photos'],
