@@ -174,7 +174,11 @@ dialog.work-form-dialog .form-grid { display: grid; grid-template-columns: repea
 dialog.work-form-dialog .form-field { min-width: 0; margin-bottom: 8px; }
 dialog.work-form-dialog .form-field > label { margin-bottom: 0; }
 dialog.work-form-dialog .form-field-wide { grid-column: 1 / -1; }
-dialog.detail-dialog { width: min(760px, 94vw); padding: 24px; overflow-y: auto; }
+dialog.detail-dialog {
+  width: min(760px, 94vw); padding: 24px; overflow-y: auto;
+  scrollbar-width: none;
+}
+dialog.detail-dialog::-webkit-scrollbar { display: none; }
 dialog::backdrop { background: #0009; }
 .detail-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .detail-heading h2 { margin-bottom: 4px; }
