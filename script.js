@@ -395,23 +395,42 @@
     }
 
     function renderJobDetails(job) {
-      const cliente = findCliente(job.cliente_id);
       const history = job.targa
         ? lavori.filter((item) => item.id !== job.id && item.targa?.toLowerCase() === job.targa.toLowerCase())
         : [];
       return `
         <div class="job-details">
-          <div class="detail-grid">
-            <div><span>Cliente</span><strong>${esc(nomeCliente(cliente) || '—')}</strong></div>
-            <div><span>Data ingresso</span><strong>${esc(formatDate(job.data_ingresso))}</strong></div>
-            <div><span>Appuntamento</span><strong>${esc(formatDateTime(job.appuntamento_at))}</strong></div>
-            <div><span>Ricambi</span><strong>${eur(job.costo_ricambi)}</strong></div>
-            <div><span>Manodopera</span><strong>${eur(job.costo_manodopera)}</strong></div>
-            <div><span>Margine stimato</span><strong>${eur(jobMargin(job))}</strong></div>
-            <div><span>Data consegna</span><strong>${esc(formatDate(job.data_consegna))}</strong></div>
-          </div>
-          ${job.note ? `<p><strong>Note:</strong> ${esc(job.note)}</p>` : ''}
-          ${safePhotoLinks(job.foto_url) ? `<div class="photo-links"><strong>Foto:</strong> ${safePhotoLinks(job.foto_url)}</div>` : ''}
+          <section class="detail-section">
+            <h3>Intervento</h3>
+            <div class="detail-grid">
+              <div><span>Stato</span><strong>${esc((STATI.find(([key]) => key === job.stato) || ['', 'Da fare'])[1])}</strong></div>
+              <div class="detail-value-wide"><span>Descrizione</span><strong>${esc(job.descrizione || '—')}</strong></div>
+            </div>
+          </section>
+          <section class="detail-section">
+            <h3>Date</h3>
+            <div class="detail-grid">
+              <div><span>Appuntamento</span><strong>${esc(formatDateTime(job.appuntamento_at))}</strong></div>
+              <div><span>Data ingresso</span><strong>${esc(formatDate(job.data_ingresso))}</strong></div>
+              <div><span>Data consegna</span><strong>${esc(formatDate(job.data_consegna))}</strong></div>
+            </div>
+          </section>
+          <section class="detail-section">
+            <h3>Importi e costi</h3>
+            <div class="detail-grid">
+              <div><span>Importo</span><strong>${eur(job.importo) || '—'}</strong></div>
+              <div><span>Ricambi</span><strong>${eur(job.costo_ricambi) || '—'}</strong></div>
+              <div><span>Manodopera</span><strong>${eur(job.costo_manodopera) || '—'}</strong></div>
+              <div><span>Margine stimato</span><strong>${eur(jobMargin(job))}</strong></div>
+            </div>
+          </section>
+          ${job.note || safePhotoLinks(job.foto_url) ? `
+            <section class="detail-section">
+              <h3>Note e foto</h3>
+              ${job.note ? `<p class="detail-note">${esc(job.note)}</p>` : ''}
+              ${safePhotoLinks(job.foto_url) ? `<div class="photo-links">${safePhotoLinks(job.foto_url)}</div>` : ''}
+            </section>
+          ` : ''}
           ${history.length ? `<div class="history-list"><strong>Altri interventi per ${esc(job.targa)}:</strong>${history.map((item) => `<p>${esc(formatDate(item.data_ingresso))} · ${esc(item.descrizione || item.veicolo || 'Lavoro')} (${esc((STATI.find(([key]) => key === item.stato) || ['', 'Da fare'])[1])})</p>`).join('')}</div>` : ''}
         </div>
       `;
@@ -432,8 +451,6 @@
           </div>
           <button type="button" class="ghost" id="close-details" aria-label="Chiudi scheda">Chiudi</button>
         </div>
-        <p>${esc(job.descrizione || '')}</p>
-        <p class="mu">Stato: ${esc((STATI.find(([key]) => key === job.stato) || ['', 'Da fare'])[1])} · Importo: ${eur(job.importo)}</p>
         ${renderJobDetails(job)}
         <div class="row">
           <button type="button" class="ghost" id="close-details-footer">Chiudi</button>
@@ -878,36 +895,48 @@
       dialog.innerHTML = `
         <form id="modal-form">
           <h2>${title}</h2>
-          ${fields.map(([key, label, type, options]) => {
-            if (type === 'select') {
-              return `
-                <label>${label}
-                  <select name="${key}">
-                    ${options.map(([value, text]) => `<option value="${value}"${value === (values[key] ?? '') ? ' selected' : ''}>${esc(text)}</option>`).join('')}
-                  </select>
-                </label>
-              `;
-            }
+          ${(() => {
+            let sectionOpen = false;
+            const markup = fields.map(([key, label, type, options]) => {
+              if (type === 'section') {
+                const closing = sectionOpen ? '</div></section>' : '';
+                sectionOpen = true;
+                return `${closing}<section class="form-section"><h3>${label}</h3><div class="form-grid">`;
+              }
 
-            if (type === 'area' || type === 'photos') {
-              const content = type === 'photos'
-                ? (Array.isArray(values[key]) ? values[key].join('\n') : '')
-                : values[key];
-              return `
-                <label>${label}
-                  <textarea name="${key}" rows="${type === 'photos' ? 4 : 3}"${requiredFields.includes(key) ? ' required' : ''}>${esc(content)}</textarea>
-                  ${type === 'photos' ? '<span class="field-help">Inserisci un link per riga (solo URL http/https).</span>' : ''}
-                </label>
-              `;
-            }
-
-            const value = type === 'datetime-local' ? toDateTimeLocal(values[key]) : values[key];
-            return `
-              <label>${label}
-                <input name="${key}" type="${type || 'text'}"${type === 'number' ? ' step="0.01" min="0"' : ''} value="${esc(value)}"${requiredFields.includes(key) ? ' required' : ''}>
-              </label>
-            `;
-          }).join('')}
+              const wideField = type === 'area' || type === 'photos' || type === 'datetime-local';
+              const fieldClass = wideField ? 'form-field form-field-wide' : 'form-field';
+              let content;
+              if (type === 'select') {
+                content = `
+                  <label>${label}
+                    <select name="${key}">
+                      ${options.map(([value, text]) => `<option value="${value}"${value === (values[key] ?? '') ? ' selected' : ''}>${esc(text)}</option>`).join('')}
+                    </select>
+                  </label>
+                `;
+              } else if (type === 'area' || type === 'photos') {
+                const contentValue = type === 'photos'
+                  ? (Array.isArray(values[key]) ? values[key].join('\n') : '')
+                  : values[key];
+                content = `
+                  <label>${label}
+                    <textarea name="${key}" rows="${type === 'photos' ? 3 : 2}"${requiredFields.includes(key) ? ' required' : ''}>${esc(contentValue)}</textarea>
+                    ${type === 'photos' ? '<span class="field-help">Inserisci un link per riga (solo URL http/https).</span>' : ''}
+                  </label>
+                `;
+              } else {
+                const value = type === 'datetime-local' ? toDateTimeLocal(values[key]) : values[key];
+                content = `
+                  <label>${label}
+                    <input name="${key}" type="${type || 'text'}"${type === 'number' ? ' step="0.01" min="0"' : ''} value="${esc(value)}"${requiredFields.includes(key) ? ' required' : ''}>
+                  </label>
+                `;
+              }
+              return `<div class="${fieldClass}">${content}</div>`;
+            }).join('');
+            return markup + (sectionOpen ? '</div></section>' : '');
+          })()}
           <div class="row">
             <button type="button" class="ghost" id="cancel">Annulla</button>
             ${deleteAction ? '<button type="button" class="danger" id="delete">Elimina</button>' : ''}
@@ -993,19 +1022,24 @@
       openModal(
         isNew ? 'Nuovo lavoro' : 'Modifica lavoro',
         [
+          ['', 'Veicolo e cliente', 'section'],
           ['targa', 'Targa'],
           ['veicolo', 'Veicolo (marca e modello)'],
           ['cliente_id', 'Cliente', 'select', [['', 'Nessuno'], ...clienti.map((cliente) => [cliente.id, nomeCliente(cliente)])]],
+          ['', 'Intervento', 'section'],
           ['descrizione', 'Lavoro da fare', 'area'],
           ['stato', 'Stato', 'select', STATI],
-          ['importo', 'Importo (€)', 'number'],
-          ['costo_ricambi', 'Costo ricambi (€)', 'number'],
-          ['costo_manodopera', 'Costo manodopera (€)', 'number'],
+          ['', 'Date', 'section'],
           ['appuntamento_at', 'Appuntamento', 'datetime-local'],
           ['data_ingresso', 'Data ingresso', 'date'],
           ['data_consegna', 'Data consegna', 'date'],
-          ['foto_url', 'Link foto', 'photos'],
-          ['note', 'Note', 'area']
+          ['', 'Importi e costi', 'section'],
+          ['importo', 'Importo (€)', 'number'],
+          ['costo_ricambi', 'Costo ricambi (€)', 'number'],
+          ['costo_manodopera', 'Costo manodopera (€)', 'number'],
+          ['', 'Note e foto', 'section'],
+          ['note', 'Note', 'area'],
+          ['foto_url', 'Link foto', 'photos']
         ],
         current,
         async (payload) => {
