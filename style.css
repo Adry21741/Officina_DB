@@ -142,6 +142,12 @@ a { color: var(--p); }
   content: 'I'; position: absolute; left: 0; top: 0; bottom: 0; width: 19px; background: #1d4fa8; color: #fff;
   font-size: 11px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 1px;
 }
+.object-type-badge {
+  display: inline-flex; align-items: center; min-height: 32px; padding: 4px 11px;
+  border: 1px solid var(--bd); border-radius: 999px;
+  background: color-mix(in srgb, var(--p) 12%, var(--card)); color: var(--p);
+  font-size: 13px; font-weight: 700;
+}
 .mu { color: var(--mu); font-size: 14px; }
 .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; flex-wrap: wrap; }
 select.st {
