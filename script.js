@@ -36,6 +36,14 @@
       ['tutti', 'Tutti']
     ];
 
+    const TIPI_OGGETTO = [
+      ['veicolo', 'Veicolo'],
+      ['motosega', 'Motosega'],
+      ['decespugliatore', 'Decespugliatore'],
+      ['motopompa', 'Motopompa'],
+      ['altro_attrezzo', 'Altro attrezzo']
+    ];
+
     let db;
     let tab = 'riepilogo';
     let filtro = 'attivi';
@@ -349,6 +357,19 @@
       return [cliente?.nome, cliente?.cognome].filter(Boolean).join(' ');
     }
 
+    function tipoOggetto(job) {
+      return job.tipo_oggetto || 'veicolo';
+    }
+
+    function etichettaTipoOggetto(job) {
+      return (TIPI_OGGETTO.find(([key]) => key === tipoOggetto(job)) || ['', 'Veicolo'])[1];
+    }
+
+    function descrizioneOggetto(job) {
+      return [job.targa, job.veicolo].filter(Boolean).join(' · ')
+        || (tipoOggetto(job) === 'veicolo' ? 'Veicolo non specificato' : etichettaTipoOggetto(job));
+    }
+
     function safePhotoLinks(value) {
       const photos = Array.isArray(value) ? value : [];
       return photos.map((photo) => {
@@ -381,28 +402,31 @@
             <div class="section-heading"><h2>Prossimi appuntamenti</h2><button class="ghost" data-show-tab="calendario">Apri calendario</button></div>
             ${appuntamenti.length ? appuntamenti.map((job) => `
               <button class="agenda-row" data-open-job="${esc(job.id)}">
-                <span><strong>${esc(job.targa || 'Lavoro')}</strong><span>${esc(job.veicolo || '')}</span></span>
+                <span><strong>${esc(descrizioneOggetto(job))}</strong><span>${esc(etichettaTipoOggetto(job))}</span></span>
                 <span>${esc(formatDateTime(job.appuntamento_at))}</span>
               </button>
             `).join('') : '<p class="mu">Non ci sono appuntamenti programmati.</p>'}
           </section>
           <section class="panel">
             <div class="section-heading"><h2>Lavori recenti</h2><button class="ghost" data-show-tab="lavori">Vedi tutti</button></div>
-            ${lavori.slice(0, 4).map((job) => `<div class="recent-row"><strong>${esc(job.targa || 'Senza targa')} · ${esc(job.veicolo || '')}</strong><span class="status-label">${esc((STATI.find(([key]) => key === job.stato) || ['', 'Da fare'])[1])}</span></div>`).join('') || '<p class="mu">Ancora nessun lavoro registrato.</p>'}
+            ${lavori.slice(0, 4).map((job) => `<div class="recent-row"><strong>${esc(descrizioneOggetto(job))}</strong><span class="status-label">${esc((STATI.find(([key]) => key === job.stato) || ['', 'Da fare'])[1])}</span></div>`).join('') || '<p class="mu">Ancora nessun lavoro registrato.</p>'}
           </section>
         </div>
       `;
     }
 
     function renderJobDetails(job) {
-      const history = job.targa
+      const history = tipoOggetto(job) === 'veicolo' && job.targa
         ? lavori.filter((item) => item.id !== job.id && item.targa?.toLowerCase() === job.targa.toLowerCase())
         : [];
       return `
         <div class="job-details">
           <section class="detail-section">
-            <h3>Intervento</h3>
+            <h3>Oggetto e intervento</h3>
             <div class="detail-grid">
+              <div><span>Tipo</span><strong>${esc(etichettaTipoOggetto(job))}</strong></div>
+              <div><span>Marca e modello</span><strong>${esc(job.veicolo || '—')}</strong></div>
+              ${tipoOggetto(job) === 'veicolo' ? `<div><span>Targa</span><strong>${esc(job.targa || '—')}</strong></div>` : ''}
               <div><span>Stato</span><strong>${esc((STATI.find(([key]) => key === job.stato) || ['', 'Da fare'])[1])}</strong></div>
               <div class="detail-value-wide"><span>Descrizione</span><strong>${esc(job.descrizione || '—')}</strong></div>
             </div>
@@ -446,8 +470,8 @@
         <div class="detail-heading">
           <div>
             <h2>Scheda lavoro</h2>
-            <div class="job-title"><strong>${esc(job.targa || 'Senza targa')} · ${esc(job.veicolo || 'Veicolo non specificato')}</strong></div>
-            ${cliente ? `<div class="mu">${esc(nomeCliente(cliente))}</div>` : ''}
+            <div class="job-title"><strong>${esc(descrizioneOggetto(job))}</strong></div>
+            <div class="mu">${esc(etichettaTipoOggetto(job))}${cliente ? ` · ${esc(nomeCliente(cliente))}` : ''}</div>
           </div>
           <button type="button" class="ghost" id="close-details" aria-label="Chiudi scheda">Chiudi</button>
         </div>
@@ -468,13 +492,16 @@
 
     function renderJobCard(job) {
       const cliente = findCliente(job.cliente_id);
+      const isVehicle = tipoOggetto(job) === 'veicolo';
       return `
         <article class="card job-card" style="--c:var(${COL[job.stato] || '--s1'})">
           <div class="top">
-            <span class="plate">${esc(job.targa || '—')}</span>
+            ${isVehicle
+              ? `<span class="plate">${esc(job.targa || '—')}</span>`
+              : `<span class="object-type-badge">${esc(etichettaTipoOggetto(job))}</span>`}
             <strong>${eur(job.importo)}</strong>
           </div>
-          <div class="job-title"><strong>${esc(job.veicolo || 'Veicolo non specificato')}</strong>${cliente ? ` · ${esc(nomeCliente(cliente))}` : ''}</div>
+          <div class="job-title"><strong>${esc(job.veicolo || (isVehicle ? 'Veicolo non specificato' : 'Marca e modello non specificati'))}</strong>${cliente ? ` · ${esc(nomeCliente(cliente))}` : ''}</div>
           <div>${esc(job.descrizione || '')}</div>
           <div class="mu">Ingresso ${esc(formatDate(job.data_ingresso))}${job.appuntamento_at ? ` · Appuntamento ${esc(formatDateTime(job.appuntamento_at))}` : ''}</div>
           <div class="top job-actions">
@@ -493,7 +520,7 @@
       const filtered = lavori.filter((job) => {
         const matchesFilter = filtro === 'tutti' || (filtro === 'attivi' ? job.stato !== 'consegnato' : job.stato === filtro);
         const cliente = findCliente(job.cliente_id);
-        const searchable = [job.targa, job.veicolo, job.descrizione, nomeCliente(cliente)].join(' ').toLowerCase();
+        const searchable = [job.targa, job.veicolo, etichettaTipoOggetto(job), job.descrizione, nomeCliente(cliente)].join(' ').toLowerCase();
         return matchesFilter && (!searchText || searchable.includes(searchText));
       });
       return filtered.length
@@ -505,11 +532,11 @@
       const searchText = q.trim().toLowerCase();
       const appointments = lavori.filter((job) => {
         const cliente = findCliente(job.cliente_id);
-        return job.appuntamento_at && [job.targa, job.veicolo, job.descrizione, nomeCliente(cliente)].join(' ').toLowerCase().includes(searchText);
+        return job.appuntamento_at && [job.targa, job.veicolo, etichettaTipoOggetto(job), job.descrizione, nomeCliente(cliente)].join(' ').toLowerCase().includes(searchText);
       }).sort((a, b) => new Date(a.appuntamento_at) - new Date(b.appuntamento_at));
 
       return appointments.length
-        ? `<div class="cards-grid agenda-grid">${appointments.map((job) => `<section class="panel agenda-card"><div class="section-heading"><div><strong>${esc(formatDateTime(job.appuntamento_at))}</strong><p>${esc(job.targa || 'Lavoro')} · ${esc(job.veicolo || '')} · ${esc(nomeCliente(findCliente(job.cliente_id)) || 'Cliente non assegnato')}</p></div><button class="ghost" data-open-job="${esc(job.id)}">Apri lavoro</button></div><p>${esc(job.descrizione || '')}</p></section>`).join('')}</div>`
+        ? `<div class="cards-grid agenda-grid">${appointments.map((job) => `<section class="panel agenda-card"><div class="section-heading"><div><strong>${esc(formatDateTime(job.appuntamento_at))}</strong><p>${esc(descrizioneOggetto(job))} · ${esc(etichettaTipoOggetto(job))} · ${esc(nomeCliente(findCliente(job.cliente_id)) || 'Cliente non assegnato')}</p></div><button class="ghost" data-open-job="${esc(job.id)}">Apri lavoro</button></div><p>${esc(job.descrizione || '')}</p></section>`).join('')}</div>`
         : '<div class="empty">Nessun appuntamento trovato.</div>';
     }
 
@@ -526,7 +553,7 @@
               ${cliente.telefono ? `<a href="tel:${esc(cliente.telefono)}">${esc(cliente.telefono)}</a>` : ''}
               <div class="mu">${cliente.note ? `${esc(cliente.note)} · ` : ''}${history.length} ${history.length === 1 ? 'lavoro' : 'lavori'}</div>
               <div class="top job-actions"><button class="ghost" data-client-exp="${esc(cliente.id)}">${expanded ? 'Nascondi storico' : 'Storico interventi'}</button></div>
-              ${expanded ? `<div class="history-list">${history.map((job) => `<div class="history-row"><span><strong>${esc(formatDate(job.data_ingresso))} · ${esc(job.targa || 'Senza targa')}</strong><br>${esc(job.veicolo || '')} — ${esc(job.descrizione || '')}</span><span>${esc((STATI.find(([key]) => key === job.stato) || ['', 'Da fare'])[1])}</span></div>`).join('') || '<p>Nessun intervento registrato.</p>'}</div>` : ''}
+              ${expanded ? `<div class="history-list">${history.map((job) => `<div class="history-row"><span><strong>${esc(formatDate(job.data_ingresso))} · ${esc(descrizioneOggetto(job))}</strong><br>${esc(job.descrizione || '')} — ${esc(etichettaTipoOggetto(job))}</span><span>${esc((STATI.find(([key]) => key === job.stato) || ['', 'Da fare'])[1])}</span></div>`).join('') || '<p>Nessun intervento registrato.</p>'}</div>` : ''}
             </article>
           `;
         }).join('');
@@ -780,9 +807,22 @@
             if (!['http:', 'https:'].includes(url.protocol)) throw new Error(`URL foto non valido alla riga ${rowNumber}.`);
           }
 
+          const rawType = normalizzaCSV(valoreCSV(record, 'Tipo', 'Tipo oggetto'));
+          const typeAliases = new Map([
+            ['', 'veicolo'],
+            ['veicolo', 'veicolo'],
+            ['auto', 'veicolo'],
+            ['automobile', 'veicolo'],
+            ...TIPI_OGGETTO.map(([key]) => [normalizzaCSV(key), key]),
+            ['altroattrezzo', 'altro_attrezzo']
+          ]);
+          const tipo = typeAliases.get(rawType);
+          if (!tipo) throw new Error(`Tipo di oggetto non riconosciuto alla riga ${rowNumber}.`);
+
           return {
-            targa: valoreCSV(record, 'Targa').trim().toUpperCase() || null,
-            veicolo: valoreCSV(record, 'Veicolo').trim() || null,
+            tipo_oggetto: tipo,
+            targa: tipo === 'veicolo' ? valoreCSV(record, 'Targa').trim().toUpperCase() || null : null,
+            veicolo: valoreCSV(record, 'Marca e modello', 'Veicolo').trim() || null,
             cliente_id: clientId,
             descrizione: description,
             stato: statoCSV(valoreCSV(record, 'Stato'), rowNumber),
@@ -835,7 +875,9 @@
         await loadData();
         toast(`Importati ${payload.length} lavori.`);
       } catch (error) {
-        toast(`Importazione non riuscita: ${error.message}`);
+        toast(/tipo_oggetto/.test(error.message)
+          ? 'Applica prima supabase_migration_features.sql in Supabase.'
+          : `Importazione non riuscita: ${error.message}`);
       }
     }
 
@@ -858,8 +900,9 @@
             ])
           ]
         : [
-            ['Targa', 'Veicolo', 'Cliente', 'Descrizione', 'Stato', 'Data ingresso', 'Appuntamento', 'Consegna', 'Importo', 'Ricambi', 'Manodopera', 'Margine stimato', 'Note', 'Foto'],
+            ['Tipo', 'Targa', 'Marca e modello', 'Cliente', 'Descrizione', 'Stato', 'Data ingresso', 'Appuntamento', 'Consegna', 'Importo', 'Ricambi', 'Manodopera', 'Margine stimato', 'Note', 'Foto'],
             ...lavori.map((job) => [
+              etichettaTipoOggetto(job),
               job.targa,
               job.veicolo,
               nomeCliente(findCliente(job.cliente_id)),
@@ -933,7 +976,7 @@
                   </label>
                 `;
               }
-              return `<div class="${fieldClass}">${content}</div>`;
+              return `<div class="${fieldClass}" data-field="${esc(key)}">${content}</div>`;
             }).join('');
             return markup + (sectionOpen ? '</div></section>' : '');
           })()}
@@ -999,7 +1042,7 @@
 
         const { error } = await saveAction(formData);
         if (error) {
-          toast(/appuntamento_at|costo_ricambi|costo_manodopera|foto_url/.test(error.message)
+          toast(/tipo_oggetto|appuntamento_at|costo_ricambi|costo_manodopera|foto_url/.test(error.message)
             ? 'Applica prima supabase_migration_features.sql in Supabase.'
             : error.message);
           return;
@@ -1016,15 +1059,16 @@
       work = work || {};
       const isNew = !work.id;
       const current = isNew
-        ? { stato: 'da_fare', data_ingresso: oggi(), costo_ricambi: 0, costo_manodopera: 0, foto_url: [] }
-        : work;
+        ? { tipo_oggetto: 'veicolo', stato: 'da_fare', data_ingresso: oggi(), costo_ricambi: 0, costo_manodopera: 0, foto_url: [] }
+        : { ...work, tipo_oggetto: tipoOggetto(work) };
 
       openModal(
         isNew ? 'Nuovo lavoro' : 'Modifica lavoro',
         [
-          ['', 'Veicolo e cliente', 'section'],
+          ['', 'Oggetto e cliente', 'section'],
+          ['tipo_oggetto', 'Tipo', 'select', TIPI_OGGETTO],
           ['targa', 'Targa'],
-          ['veicolo', 'Veicolo (marca e modello)'],
+          ['veicolo', 'Marca e modello'],
           ['cliente_id', 'Cliente', 'select', [['', 'Nessuno'], ...clienti.map((cliente) => [cliente.id, nomeCliente(cliente)])]],
           ['', 'Intervento', 'section'],
           ['descrizione', 'Lavoro da fare', 'area'],
@@ -1056,6 +1100,17 @@
         isNew ? null : () => db.from('lavori').delete().eq('id', work.id),
         'work-form-dialog'
       );
+
+      const form = $('#modal-form');
+      const typeField = form.elements.tipo_oggetto;
+      const targaField = form.querySelector('[data-field="targa"]');
+      const updateObjectFields = () => {
+        const isVehicle = typeField.value === 'veicolo';
+        targaField.hidden = !isVehicle;
+        if (!isVehicle) form.elements.targa.value = '';
+      };
+      typeField.onchange = updateObjectFields;
+      updateObjectFields();
     }
 
     function openClientForm(cliente) {
