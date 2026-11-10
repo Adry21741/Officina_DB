@@ -43,6 +43,9 @@
       ['motopompa', 'Motopompa'],
       ['altro_attrezzo', 'Altro attrezzo']
     ];
+    const PHOTO_BUCKET = 'lavori-foto';
+    const PHOTO_MAX_SIZE = 10 * 1024 * 1024;
+    const PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
     let db;
     let tab = 'riepilogo';
@@ -370,17 +373,75 @@
         || (tipoOggetto(job) === 'veicolo' ? 'Veicolo non specificato' : etichettaTipoOggetto(job));
     }
 
-    function safePhotoLinks(value) {
+    function externalPhotoUrl(photo) {
+      try {
+        const url = new URL(photo);
+        return ['http:', 'https:'].includes(url.protocol) ? url.href : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function photoName(photo) {
+      if (externalPhotoUrl(photo)) return 'Foto collegata';
+      return decodeURIComponent(String(photo).split('/').pop() || 'Foto caricata');
+    }
+
+    async function renderPhotoGallery(value) {
       const photos = Array.isArray(value) ? value : [];
-      return photos.map((photo) => {
-        try {
-          const url = new URL(photo);
-          if (!['http:', 'https:'].includes(url.protocol)) return '';
-          return `<a href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">Apri foto</a>`;
-        } catch {
-          return '';
+      const rendered = await Promise.all(photos.map(async (photo) => {
+        const externalUrl = externalPhotoUrl(photo);
+        if (externalUrl) {
+          return `<a href="${esc(externalUrl)}" target="_blank" rel="noopener noreferrer">Apri foto</a>`;
         }
-      }).filter(Boolean).join('');
+
+        const { data, error } = await db.storage.from(PHOTO_BUCKET).createSignedUrl(photo, 3600);
+        if (error) throw new Error(error.message);
+        return `<a href="${esc(data.signedUrl)}" target="_blank" rel="noopener noreferrer"><img src="${esc(data.signedUrl)}" alt="${esc(photoName(photo))}" loading="lazy"></a>`;
+      }));
+      return rendered.join('');
+    }
+
+    async function removeStoredPhotos(paths) {
+      if (!paths.length) return null;
+      try {
+        const { error } = await db.storage.from(PHOTO_BUCKET).remove(paths);
+        return error?.message || null;
+      } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+      }
+    }
+
+    async function uploadWorkPhotos(files) {
+      const uploadedPaths = [];
+      for (const file of files) {
+        const extension = file.name.includes('.')
+          ? file.name.split('.').pop().replace(/[^a-z0-9]/gi, '').toLowerCase()
+          : '';
+        const path = `jobs/${crypto.randomUUID()}${extension ? `.${extension}` : ''}`;
+        let uploadError;
+        try {
+          const { error } = await db.storage.from(PHOTO_BUCKET).upload(path, file, {
+            cacheControl: '3600',
+            contentType: file.type,
+            upsert: false
+          });
+          uploadError = error?.message;
+        } catch (error) {
+          uploadError = error instanceof Error ? error.message : String(error);
+        }
+        if (uploadError) {
+          const cleanupError = await removeStoredPhotos(uploadedPaths);
+          return {
+            paths: [],
+            error: cleanupError
+              ? `${uploadError} (pulizia delle foto caricate non riuscita: ${cleanupError})`
+              : uploadError
+          };
+        }
+        uploadedPaths.push(path);
+      }
+      return { paths: uploadedPaths, error: null };
     }
 
     function renderSummary() {
@@ -448,11 +509,11 @@
               <div><span>Margine stimato</span><strong>${eur(jobMargin(job))}</strong></div>
             </div>
           </section>
-          ${job.note || safePhotoLinks(job.foto_url) ? `
+          ${job.note || (Array.isArray(job.foto_url) && job.foto_url.length) ? `
             <section class="detail-section">
               <h3>Note e foto</h3>
               ${job.note ? `<p class="detail-note">${esc(job.note)}</p>` : ''}
-              ${safePhotoLinks(job.foto_url) ? `<div class="photo-links">${safePhotoLinks(job.foto_url)}</div>` : ''}
+              ${Array.isArray(job.foto_url) && job.foto_url.length ? '<div class="photo-gallery" data-photo-gallery>Caricamento foto…</div>' : ''}
             </section>
           ` : ''}
           ${history.length ? `<div class="history-list"><strong>Altri interventi per ${esc(job.targa)}:</strong>${history.map((item) => `<p>${esc(formatDate(item.data_ingresso))} · ${esc(item.descrizione || item.veicolo || 'Lavoro')} (${esc((STATI.find(([key]) => key === item.stato) || ['', 'Da fare'])[1])})</p>`).join('')}</div>` : ''}
@@ -460,7 +521,7 @@
       `;
     }
 
-    function openWorkDetails(job) {
+    async function openWorkDetails(job) {
       if (!job) return;
       const dialog = $('#dlg');
       const cliente = findCliente(job.cliente_id);
@@ -488,6 +549,15 @@
         openWorkForm(job);
       };
       dialog.showModal();
+      const gallery = dialog.querySelector('[data-photo-gallery]');
+      if (gallery) {
+        try {
+          gallery.innerHTML = await renderPhotoGallery(job.foto_url);
+        } catch (error) {
+          gallery.textContent = 'Impossibile caricare le foto.';
+          toast(`Impossibile caricare le foto: ${error.message}`);
+        }
+      }
     }
 
     function renderJobCard(job) {
@@ -798,13 +868,10 @@
           if (customerName && !clientId) throw new Error(`Cliente "${customerName}" non trovato alla riga ${rowNumber}. Importa prima il CSV clienti.`);
           const photos = valoreCSV(record, 'Foto').split(/\s+/).filter(Boolean);
           for (const photo of photos) {
-            let url;
-            try {
-              url = new URL(photo);
-            } catch {
-              throw new Error(`URL foto non valido alla riga ${rowNumber}.`);
+            if (externalPhotoUrl(photo)) continue;
+            if (!/^jobs\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:\.[a-z0-9]+)?$/i.test(photo)) {
+              throw new Error(`Foto non valida alla riga ${rowNumber}.`);
             }
-            if (!['http:', 'https:'].includes(url.protocol)) throw new Error(`URL foto non valido alla riga ${rowNumber}.`);
           }
 
           const rawType = normalizzaCSV(valoreCSV(record, 'Tipo', 'Tipo oggetto'));
@@ -934,6 +1001,14 @@
       dialog.classList.remove('detail-dialog');
       dialog.classList.toggle('work-form-dialog', dialogClass === 'work-form-dialog');
       const requiredFields = ['nome', 'descrizione'];
+      let retainedPhotos = fields.some(([, , type]) => type === 'photos') && Array.isArray(values.foto_url)
+        ? [...values.foto_url]
+        : [];
+      const renderExistingPhotos = () => retainedPhotos.length
+        ? `<ul class="existing-photos">${retainedPhotos.map((photo, index) => `
+            <li><span>${esc(photoName(photo))}</span><button type="button" class="ghost" data-photo-index="${index}" aria-label="Rimuovi ${esc(photoName(photo))}">Rimuovi</button></li>
+          `).join('')}</ul>`
+        : '<span class="field-help">Nessuna foto aggiunta.</span>';
 
       dialog.innerHTML = `
         <form id="modal-form">
@@ -958,14 +1033,19 @@
                     </select>
                   </label>
                 `;
-              } else if (type === 'area' || type === 'photos') {
-                const contentValue = type === 'photos'
-                  ? (Array.isArray(values[key]) ? values[key].join('\n') : '')
-                  : values[key];
+              } else if (type === 'photos') {
                 content = `
                   <label>${label}
-                    <textarea name="${key}" rows="${type === 'photos' ? 3 : 2}"${requiredFields.includes(key) ? ' required' : ''}>${esc(contentValue)}</textarea>
-                    ${type === 'photos' ? '<span class="field-help">Inserisci un link per riga (solo URL http/https).</span>' : ''}
+                    <input name="foto_files" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple>
+                    <span class="field-help">Seleziona immagini JPG, PNG, WebP o GIF (massimo 10 MB ciascuna).</span>
+                  </label>
+                  <div data-existing-photos>${renderExistingPhotos()}</div>
+                  <div class="selected-photos field-help" data-selected-photos></div>
+                `;
+              } else if (type === 'area') {
+                content = `
+                  <label>${label}
+                    <textarea name="${key}" rows="2"${requiredFields.includes(key) ? ' required' : ''}>${esc(values[key])}</textarea>
                   </label>
                 `;
               } else {
@@ -983,12 +1063,28 @@
           <div class="row">
             <button type="button" class="ghost" id="cancel">Annulla</button>
             ${deleteAction ? '<button type="button" class="danger" id="delete">Elimina</button>' : ''}
-            <button>Salva</button>
+            <button type="submit">Salva</button>
           </div>
         </form>
       `;
 
       $('#cancel').onclick = () => dialog.close();
+
+      const photoInput = dialog.querySelector('input[name="foto_files"]');
+      if (photoInput) {
+        photoInput.onchange = () => {
+          const names = Array.from(photoInput.files, (file) => file.name);
+          dialog.querySelector('[data-selected-photos]').textContent = names.length
+            ? `Nuove foto: ${names.join(', ')}`
+            : '';
+        };
+        dialog.querySelector('[data-existing-photos]').onclick = (event) => {
+          const button = event.target.closest('button[data-photo-index]');
+          if (!button) return;
+          retainedPhotos.splice(Number(button.dataset.photoIndex), 1);
+          dialog.querySelector('[data-existing-photos]').innerHTML = renderExistingPhotos();
+        };
+      }
 
       if (deleteAction) {
         $('#delete').onclick = async () => {
@@ -1006,6 +1102,8 @@
       $('#modal-form').onsubmit = async (event) => {
         event.preventDefault();
         const formData = Object.fromEntries(new FormData(event.target));
+        const selectedPhotoFiles = photoInput ? Array.from(photoInput.files) : [];
+        delete formData.foto_files;
 
         Object.keys(formData).forEach((key) => {
           if (formData[key] === '') {
@@ -1017,18 +1115,13 @@
           formData.appuntamento_at = new Date(formData.appuntamento_at).toISOString();
         }
 
-        if (formData.foto_url !== undefined) {
-          const urls = String(formData.foto_url || '').split(/\r?\n/).map((value) => value.trim()).filter(Boolean);
-          for (const value of urls) {
-            try {
-              const url = new URL(value);
-              if (!['http:', 'https:'].includes(url.protocol)) throw new Error();
-            } catch {
-              toast('Ogni foto deve avere un URL valido che inizi con http:// o https://.');
-              return;
-            }
+        if (photoInput) {
+          const invalidPhoto = selectedPhotoFiles.find((file) => !PHOTO_MIME_TYPES.includes(file.type) || file.size > PHOTO_MAX_SIZE);
+          if (invalidPhoto) {
+            toast('Seleziona solo immagini JPG, PNG, WebP o GIF fino a 10 MB ciascuna.');
+            return;
           }
-          formData.foto_url = urls;
+          formData.foto_url = retainedPhotos;
         }
 
         for (const key of ['costo_ricambi', 'costo_manodopera']) {
@@ -1040,11 +1133,22 @@
           }
         }
 
-        const { error } = await saveAction(formData);
+        const submitButton = event.submitter || event.target.querySelector('button[type="submit"]');
+        submitButton.disabled = true;
+        let result;
+        try {
+          result = await saveAction(formData, { files: selectedPhotoFiles });
+        } catch (error) {
+          toast(error instanceof Error ? error.message : String(error));
+          submitButton.disabled = false;
+          return;
+        }
+        const { error } = result;
         if (error) {
-          toast(/tipo_oggetto|appuntamento_at|costo_ricambi|costo_manodopera|foto_url/.test(error.message)
-            ? 'Applica prima supabase_migration_features.sql in Supabase.'
+          toast(/tipo_oggetto|appuntamento_at|costo_ricambi|costo_manodopera|foto_url|foto non salvate/i.test(error.message)
+            ? 'Applica o aggiorna supabase_migration_features.sql in Supabase.'
             : error.message);
+          submitButton.disabled = false;
           return;
         }
 
@@ -1083,21 +1187,51 @@
           ['costo_manodopera', 'Costo manodopera (€)', 'number'],
           ['', 'Note e foto', 'section'],
           ['note', 'Note', 'area'],
-          ['foto_url', 'Link foto', 'photos']
+          ['foto_url', 'Foto', 'photos']
         ],
         current,
-        async (payload) => {
+        async (payload, { files }) => {
           if (payload.targa) {
             payload.targa = payload.targa.trim().toUpperCase();
           }
 
           payload.data_consegna = payload.data_consegna || (payload.stato === 'consegnato' ? (work.data_consegna || oggi()) : null);
+          const uploaded = await uploadWorkPhotos(files);
+          if (uploaded.error) {
+            return { error: { message: `Foto non salvate: ${uploaded.error}` } };
+          }
 
-          return isNew
-            ? db.from('lavori').insert(payload)
-            : db.from('lavori').update(payload).eq('id', work.id);
+          payload.foto_url = [...payload.foto_url, ...uploaded.paths];
+          const result = isNew
+            ? await db.from('lavori').insert(payload)
+            : await db.from('lavori').update(payload).eq('id', work.id);
+          if (result.error) {
+            const cleanupError = await removeStoredPhotos(uploaded.paths);
+            return {
+              error: {
+                message: cleanupError
+                  ? `${result.error.message} (pulizia delle nuove foto non riuscita: ${cleanupError})`
+                  : result.error.message
+              }
+            };
+          }
+
+          const retainedPaths = new Set(payload.foto_url);
+          const removedPaths = (Array.isArray(work.foto_url) ? work.foto_url : [])
+            .filter((photo) => !externalPhotoUrl(photo) && !retainedPaths.has(photo));
+          const cleanupError = await removeStoredPhotos(removedPaths);
+          if (cleanupError) toast(`Lavoro salvato, ma non è stato possibile rimuovere alcune vecchie foto: ${cleanupError}`);
+          return result;
         },
-        isNew ? null : () => db.from('lavori').delete().eq('id', work.id),
+        isNew ? null : async () => {
+          const result = await db.from('lavori').delete().eq('id', work.id);
+          if (result.error) return result;
+          const photoPaths = (Array.isArray(work.foto_url) ? work.foto_url : [])
+            .filter((photo) => !externalPhotoUrl(photo));
+          const cleanupError = await removeStoredPhotos(photoPaths);
+          if (cleanupError) toast(`Lavoro eliminato, ma non è stato possibile rimuovere alcune foto: ${cleanupError}`);
+          return result;
+        },
         'work-form-dialog'
       );
 

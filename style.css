@@ -210,9 +210,15 @@ dialog.detail-dialog .detail-note {
   background: color-mix(in srgb, var(--p) 7%, var(--bg));
   font-size: 16px; line-height: 1.55;
 }
-dialog.detail-dialog .photo-links a {
-  display: inline-block; padding: 8px 12px; border: 1px solid var(--bd);
-  border-radius: 10px; background: var(--bg); font-weight: 600;
+dialog.detail-dialog .photo-gallery {
+  display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;
+}
+dialog.detail-dialog .photo-gallery a {
+  display: grid; place-items: center; min-height: 44px; padding: 4px;
+  border: 1px solid var(--bd); border-radius: 10px; background: var(--bg); font-weight: 600;
+}
+dialog.detail-dialog .photo-gallery img {
+  display: block; width: 140px; height: 110px; object-fit: cover; border-radius: 6px;
 }
 #toast {
   position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom)); transform: translateX(-50%);
@@ -260,8 +266,21 @@ dialog.detail-dialog .photo-links a {
 .history-list p { margin: 6px 0; }
 .history-row { padding: 9px 0; border-top: 1px solid var(--bd); }
 .history-row > span:last-child { color: var(--mu); white-space: nowrap; }
-.photo-links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
 .field-help { display: block; margin-top: 5px; color: var(--mu); font-size: 12px; }
+dialog.work-form-dialog input[name="foto_files"] {
+  min-height: 58px; padding: 8px; border: 1.5px dashed var(--p); border-radius: 12px;
+  background: color-mix(in srgb, var(--p) 6%, var(--card)); cursor: pointer;
+}
+dialog.work-form-dialog input[name="foto_files"]::file-selector-button {
+  min-height: 38px; margin-right: 10px; padding: 7px 14px; border: 0; border-radius: 8px;
+  background: var(--p); color: var(--on); font: inherit; font-weight: 700; cursor: pointer;
+  transition: filter .15s ease;
+}
+dialog.work-form-dialog input[name="foto_files"]::file-selector-button:hover { filter: brightness(.92); }
+.existing-photos { display: grid; gap: 6px; margin: 8px 0; padding: 0; list-style: none; }
+.existing-photos li { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.existing-photos li button { min-height: 34px; padding: 5px 10px; font-size: 13px; }
+.selected-photos { overflow-wrap: anywhere; }
 .export-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
 .csv-file-input { display: none; }
 
