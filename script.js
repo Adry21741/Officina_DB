@@ -138,7 +138,7 @@
       $('#app').classList.add('login-page');
       const rememberedEmail = localStorage.getItem('rememberedEmail') || '';
       $('#app').innerHTML = `
-        <h1 class="brand-title"><img src="logo.svg" alt=""><span>Officina di Casa</span></h1>
+        <h1 class="brand-title"><img src="logo2.png" alt=""><span>Officina di Casa</span></h1>
         <form id="login-form">
           <label>Email
             <input name="email" type="email" autocomplete="username" value="${esc(rememberedEmail)}" required>
@@ -209,7 +209,7 @@
       $('#app').classList.remove('login-page');
       $('#app').innerHTML = `
         <header>
-          <h1 class="brand-title"><img src="logo.svg" alt=""><span>Officina di Casa</span></h1>
+          <h1 class="brand-title"><img src="logo2.png" alt=""><span>Officina di Casa</span></h1>
           <button class="ghost" id="logout">Esci</button>
         </header>
         <nav class="tabs" aria-label="Sezioni">
